@@ -8,65 +8,83 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit();
 }
 
-$post = [
+$category = [
     'id' => '',
-    'title' => '',
-    'content' => '',
-    'status' => 'draft'
+    'name' => '',
+    'slug' => '',
+    'description' => '',
+    'parent_id' => null
 ];
 
-// Ambil semua kategori
+// Ambil semua kategori untuk pilihan parent
 try {
-    $stmt = $pdo->query("SELECT id, name FROM categories ORDER BY name ASC");
-    $categories = $stmt->fetchAll();
+    $stmt = $pdo->query("SELECT id, name FROM categories WHERE id != " . (isset($_GET['id']) ? (int)$_GET['id'] : 0) . " ORDER BY name ASC");
+    $parent_categories = $stmt->fetchAll();
 } catch(PDOException $e) {
     $error = "Gagal mengambil data kategori: " . $e->getMessage();
 }
 
-// Jika ada ID, ambil data artikel
+// Jika ada ID, ambil data kategori
 if (isset($_GET['id'])) {
     $id = (int)$_GET['id'];
     try {
-        $stmt = $pdo->prepare("SELECT * FROM posts WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT * FROM categories WHERE id = ?");
         $stmt->execute([$id]);
-        $post = $stmt->fetch();
-        if (!$post) {
-            header("Location: posts.php");
+        $category = $stmt->fetch();
+        if (!$category) {
+            header("Location: categories.php");
             exit();
         }
     } catch(PDOException $e) {
-        $error = "Gagal mengambil data artikel: " . $e->getMessage();
+        $error = "Gagal mengambil data kategori: " . $e->getMessage();
     }
 }
 
 // Proses form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = trim($_POST['title']);
-    $content = trim($_POST['content']);
-    $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+    $name = trim($_POST['name']);
+    $slug = trim($_POST['slug']);
+    $description = trim($_POST['description']);
+    $parent_id = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     
     // Validasi
-    if (empty($title)) {
-        $error = "Judul tidak boleh kosong!";
-    } elseif (empty($content)) {
-        $error = "Konten tidak boleh kosong!";
+    if (empty($name)) {
+        $error = "Nama kategori tidak boleh kosong!";
+    } elseif (empty($slug)) {
+        $error = "Slug tidak boleh kosong!";
     } else {
         try {
-            if (isset($_POST['id'])) {
-                // Update artikel
-                $stmt = $pdo->prepare("UPDATE posts SET title = ?, content = ?, category_id = ? WHERE id = ?");
-                $stmt->execute([$title, $content, $category_id, $_POST['id']]);
+            // Cek slug sudah ada atau belum
+            $stmt = $pdo->prepare("SELECT id FROM categories WHERE slug = ? AND id != ?");
+            $stmt->execute([$slug, isset($_POST['id']) ? $_POST['id'] : 0]);
+            if ($stmt->rowCount() > 0) {
+                $error = "Slug sudah digunakan!";
             } else {
-                // Tambah artikel baru
-                $stmt = $pdo->prepare("INSERT INTO posts (title, content, category_id) VALUES (?, ?, ?)");
-                $stmt->execute([$title, $content, $category_id]);
+                if (isset($_POST['id'])) {
+                    // Update kategori
+                    $stmt = $pdo->prepare("UPDATE categories SET name = ?, slug = ?, description = ?, parent_id = ? WHERE id = ?");
+                    $stmt->execute([$name, $slug, $description, $parent_id, $_POST['id']]);
+                } else {
+                    // Tambah kategori baru
+                    $stmt = $pdo->prepare("INSERT INTO categories (name, slug, description, parent_id) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([$name, $slug, $description, $parent_id]);
+                }
+                header("Location: categories.php?message=saved");
+                exit();
             }
-            header("Location: posts.php?message=saved");
-            exit();
         } catch(PDOException $e) {
-            $error = "Gagal menyimpan artikel: " . $e->getMessage();
+            $error = "Gagal menyimpan kategori: " . $e->getMessage();
         }
     }
+}
+
+// Fungsi untuk membuat slug
+function createSlug($str) {
+    $str = strtolower($str);
+    $str = preg_replace('/[^a-z0-9\s-]/', '', $str);
+    $str = preg_replace('/[\s-]+/', ' ', $str);
+    $str = preg_replace('/\s/', '-', $str);
+    return $str;
 }
 ?>
 <!DOCTYPE html>
@@ -74,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin CMS | <?php echo $post['id'] ? 'Edit' : 'Tambah'; ?> Artikel</title>
+    <title>Admin CMS | <?php echo $category['id'] ? 'Edit' : 'Tambah'; ?> Kategori</title>
 
     <!-- Google Font: Source Sans Pro -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
@@ -82,8 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Theme style -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <!-- Summernote -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs4.min.css">
 </head>
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
@@ -131,9 +147,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="posts.php" class="nav-link active">
+                        <a href="posts.php" class="nav-link">
                             <i class="nav-icon fas fa-newspaper"></i>
                             <p>Artikel</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="categories.php" class="nav-link active">
+                            <i class="nav-icon fas fa-tags"></i>
+                            <p>Kategori</p>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -154,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="m-0"><?php echo $post['id'] ? 'Edit' : 'Tambah'; ?> Artikel</h1>
+                        <h1 class="m-0"><?php echo $category['id'] ? 'Edit' : 'Tambah'; ?> Kategori</h1>
                     </div>
                 </div>
             </div>
@@ -163,37 +185,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Main content -->
         <div class="content">
             <div class="container-fluid">
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger alert-dismissible">
+                        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                        <?php echo $error; ?>
+                    </div>
+                <?php endif; ?>
+
                 <div class="card">
                     <div class="card-body">
                         <form method="POST" action="">
-                            <?php if ($post['id']): ?>
-                                <input type="hidden" name="id" value="<?php echo $post['id']; ?>">
+                            <?php if ($category['id']): ?>
+                                <input type="hidden" name="id" value="<?php echo $category['id']; ?>">
                             <?php endif; ?>
                             
                             <div class="form-group">
-                                <label for="title">Judul</label>
-                                <input type="text" class="form-control" id="title" name="title" value="<?php echo htmlspecialchars($post['title']); ?>" required>
+                                <label for="name">Nama Kategori</label>
+                                <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($category['name']); ?>" required>
                             </div>
                             
                             <div class="form-group">
-                                <label for="category_id">Kategori</label>
-                                <select class="form-control" id="category_id" name="category_id">
-                                    <option value="">Pilih Kategori</option>
-                                    <?php foreach ($categories as $category): ?>
-                                        <option value="<?php echo $category['id']; ?>" <?php echo ($post['category_id'] == $category['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($category['name']); ?>
+                                <label for="parent_id">Kategori Induk</label>
+                                <select class="form-control" id="parent_id" name="parent_id">
+                                    <option value="">Tidak Ada (Kategori Utama)</option>
+                                    <?php foreach ($parent_categories as $parent): ?>
+                                        <option value="<?php echo $parent['id']; ?>" <?php echo ($category['parent_id'] == $parent['id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($parent['name']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <small class="form-text text-muted">Pilih kategori induk jika ini adalah sub-kategori</small>
                             </div>
                             
                             <div class="form-group">
-                                <label for="content">Konten</label>
-                                <textarea class="form-control" id="content" name="content" rows="10" required><?php echo htmlspecialchars($post['content']); ?></textarea>
+                                <label for="slug">Slug</label>
+                                <input type="text" class="form-control" id="slug" name="slug" value="<?php echo htmlspecialchars($category['slug']); ?>" required>
+                                <small class="form-text text-muted">Slug akan otomatis dibuat dari nama kategori jika dikosongkan</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="description">Deskripsi</label>
+                                <textarea class="form-control" id="description" name="description" rows="3"><?php echo htmlspecialchars($category['description']); ?></textarea>
                             </div>
                             
                             <button type="submit" class="btn btn-primary">Simpan</button>
-                            <a href="posts.php" class="btn btn-default">Batal</a>
+                            <a href="categories.php" class="btn btn-default">Batal</a>
                         </form>
                     </div>
                 </div>
@@ -216,23 +252,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
 <!-- AdminLTE App -->
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
-<!-- Summernote -->
-<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs4.min.js"></script>
 <script>
-$(document).ready(function() {
-    $('#content').summernote({
-        height: 300,
-        toolbar: [
-            ['style', ['style']],
-            ['font', ['bold', 'underline', 'clear']],
-            ['color', ['color']],
-            ['para', ['ul', 'ol', 'paragraph']],
-            ['table', ['table']],
-            ['insert', ['link', 'picture']],
-            ['view', ['fullscreen', 'codeview', 'help']]
-        ],
-        lang: 'id-ID'
-    });
+// Auto-generate slug from name
+document.getElementById('name').addEventListener('input', function() {
+    var slug = document.getElementById('slug');
+    if (slug.value === '') {
+        slug.value = this.value.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/[\s-]+/g, ' ')
+            .replace(/\s/g, '-');
+    }
 });
 </script>
 </body>

@@ -8,53 +8,32 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit();
 }
 
-// Hapus artikel
+// Hapus kategori
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     try {
-        $stmt = $pdo->prepare("DELETE FROM posts WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
         $stmt->execute([$id]);
-        header("Location: posts.php?message=deleted");
+        header("Location: categories.php?message=deleted");
         exit();
     } catch(PDOException $e) {
-        $error = "Gagal menghapus artikel: " . $e->getMessage();
+        $error = "Gagal menghapus kategori: " . $e->getMessage();
     }
 }
 
-// Ambil semua kategori untuk filter
+// Ambil semua kategori dengan informasi parent
 try {
-    $stmt = $pdo->query("SELECT id, name FROM categories ORDER BY name ASC");
+    $stmt = $pdo->query("
+        SELECT c.*, 
+               p.name as parent_name,
+               (SELECT COUNT(*) FROM posts WHERE category_id = c.id) as post_count
+        FROM categories c
+        LEFT JOIN categories p ON c.parent_id = p.id
+        ORDER BY COALESCE(c.parent_id, c.id), c.name ASC
+    ");
     $categories = $stmt->fetchAll();
 } catch(PDOException $e) {
     $error = "Gagal mengambil data kategori: " . $e->getMessage();
-}
-
-// Filter berdasarkan kategori
-$category_filter = isset($_GET['category']) ? (int)$_GET['category'] : 0;
-$where_clause = $category_filter > 0 ? "WHERE p.category_id = " . $category_filter : "";
-
-// Ambil semua artikel
-try {
-    $stmt = $pdo->query("SELECT p.*, c.name as category_name 
-                         FROM posts p 
-                         LEFT JOIN categories c ON p.category_id = c.id 
-                         $where_clause
-                         ORDER BY p.created_at DESC");
-    $posts = $stmt->fetchAll();
-} catch(PDOException $e) {
-    $error = "Gagal mengambil data artikel: " . $e->getMessage();
-}
-
-// Ambil statistik
-try {
-    $stmt = $pdo->query("SELECT 
-                            COUNT(*) as total_posts,
-                            SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_posts,
-                            SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_posts
-                         FROM posts");
-    $stats = $stmt->fetch();
-} catch(PDOException $e) {
-    $error = "Gagal mengambil statistik: " . $e->getMessage();
 }
 ?>
 <!DOCTYPE html>
@@ -62,7 +41,7 @@ try {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin CMS | Artikel</title>
+    <title>Admin CMS | Kategori</title>
 
     <!-- Google Font: Source Sans Pro -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
@@ -119,9 +98,15 @@ try {
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="posts.php" class="nav-link active">
+                        <a href="posts.php" class="nav-link">
                             <i class="nav-icon fas fa-newspaper"></i>
                             <p>Artikel</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="categories.php" class="nav-link active">
+                            <i class="nav-icon fas fa-tags"></i>
+                            <p>Kategori</p>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -142,11 +127,11 @@ try {
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="m-0">Artikel</h1>
+                        <h1 class="m-0">Kategori</h1>
                     </div>
                     <div class="col-sm-6">
-                        <a href="post-edit.php" class="btn btn-primary float-right">
-                            <i class="fas fa-plus"></i> Tambah Artikel
+                        <a href="category-edit.php" class="btn btn-primary float-right">
+                            <i class="fas fa-plus"></i> Tambah Kategori
                         </a>
                     </div>
                 </div>
@@ -156,120 +141,64 @@ try {
         <!-- Main content -->
         <div class="content">
             <div class="container-fluid">
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger alert-dismissible">
+                        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                        <?php echo $error; ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (isset($_GET['message'])): ?>
                     <div class="alert alert-success alert-dismissible">
                         <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
                         <?php
                         switch($_GET['message']) {
                             case 'deleted':
-                                echo "Artikel berhasil dihapus!";
+                                echo "Kategori berhasil dihapus!";
                                 break;
                             case 'saved':
-                                echo "Artikel berhasil disimpan!";
+                                echo "Kategori berhasil disimpan!";
                                 break;
                         }
                         ?>
                     </div>
                 <?php endif; ?>
 
-                <div class="row">
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-info">
-                            <div class="inner">
-                                <h3><?php echo $stats['total_posts']; ?></h3>
-                                <p>Total Artikel</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-newspaper"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-success">
-                            <div class="inner">
-                                <h3><?php echo $stats['published_posts']; ?></h3>
-                                <p>Artikel Dipublikasi</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-check"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-warning">
-                            <div class="inner">
-                                <h3><?php echo $stats['draft_posts']; ?></h3>
-                                <p>Artikel Draft</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-pencil-alt"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-danger">
-                            <div class="inner">
-                                <h3><?php echo count($categories); ?></h3>
-                                <p>Total Kategori</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-tags"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Filter Artikel</h3>
-                    </div>
-                    <div class="card-body">
-                        <form method="GET" action="" class="form-inline">
-                            <div class="form-group mb-2">
-                                <label for="category" class="mr-2">Kategori:</label>
-                                <select class="form-control" id="category" name="category" onchange="this.form.submit()">
-                                    <option value="0">Semua Kategori</option>
-                                    <?php foreach ($categories as $category): ?>
-                                        <option value="<?php echo $category['id']; ?>" <?php echo ($category_filter == $category['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($category['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
                 <div class="card">
                     <div class="card-body">
-                        <table id="postsTable" class="table table-bordered table-striped">
+                        <table id="categoriesTable" class="table table-bordered table-striped">
                             <thead>
                                 <tr>
-                                    <th>Judul</th>
-                                    <th>Kategori</th>
-                                    <th>Status</th>
-                                    <th>Tanggal</th>
+                                    <th>Nama Kategori</th>
+                                    <th>Slug</th>
+                                    <th>Deskripsi</th>
+                                    <th>Jumlah Artikel</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($posts as $post): ?>
+                                <?php foreach ($categories as $category): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($post['title']); ?></td>
-                                    <td><?php echo $post['category_name'] ? htmlspecialchars($post['category_name']) : '-'; ?></td>
                                     <td>
-                                        <?php if ($post['status'] == 'published'): ?>
-                                            <span class="badge badge-success">Published</span>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning">Draft</span>
+                                        <?php if ($category['parent_id']): ?>
+                                            <span class="text-muted">└─ </span>
+                                        <?php endif; ?>
+                                        <?php echo htmlspecialchars($category['name']); ?>
+                                        <?php if ($category['parent_name']): ?>
+                                            <small class="text-muted">(<?php echo htmlspecialchars($category['parent_name']); ?>)</small>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?php echo date('d/m/Y', strtotime($post['created_at'])); ?></td>
+                                    <td><?php echo htmlspecialchars($category['slug']); ?></td>
+                                    <td><?php echo htmlspecialchars($category['description']); ?></td>
+                                    <td><?php echo $category['post_count']; ?></td>
                                     <td>
-                                        <a href="post-edit.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-info">
+                                        <a href="category-archive.php?slug=<?php echo $category['slug']; ?>" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="category-edit.php?id=<?php echo $category['id']; ?>" class="btn btn-sm btn-info">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <a href="posts.php?delete=<?php echo $post['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Apakah Anda yakin ingin menghapus artikel ini?')">
+                                        <a href="categories.php?delete=<?php echo $category['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Apakah Anda yakin ingin menghapus kategori ini?')">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </td>
@@ -303,7 +232,7 @@ try {
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
 <script>
 $(document).ready(function() {
-    $('#postsTable').DataTable({
+    $('#categoriesTable').DataTable({
         "paging": true,
         "lengthChange": true,
         "searching": true,
