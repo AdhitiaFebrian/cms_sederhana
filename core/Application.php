@@ -10,13 +10,22 @@ class Application
 
     public function __construct()
     {
+        // Inisialisasi session dan auth
+        Session::start();
+        Auth::init();
+
         $this->router = new Router();
         $this->registerRoutes();
     }
 
     private function registerRoutes()
     {
-        // Register routes di sini
+        // Auth routes
+        $this->router->get('/login', 'AuthController', 'login');
+        $this->router->post('/login', 'AuthController', 'login');
+        $this->router->get('/logout', 'AuthController', 'logout');
+
+        // Home route
         $this->router->get('/', 'HomeController', 'index');
     }
 

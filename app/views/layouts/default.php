@@ -15,28 +15,52 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
+                    <?php if (Auth::check()): ?>
                     <li class="nav-item">
                         <a class="nav-link" href="<?= View::url('posts') ?>">Posts</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="<?= View::url('categories') ?>">Categories</a>
                     </li>
+                    <?php if (Auth::isAdmin()): ?>
                     <li class="nav-item">
                         <a class="nav-link" href="<?= View::url('users') ?>">Users</a>
                     </li>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </ul>
+                <ul class="navbar-nav">
+                    <?php if (Auth::check()): ?>
+                    <li class="nav-item">
+                        <span class="nav-link">Welcome, <?= Auth::user()['username'] ?></span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= View::url('logout') ?>">Logout</a>
+                    </li>
+                    <?php else: ?>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= View::url('login') ?>">Login</a>
+                    </li>
+                    <?php endif; ?>
                 </ul>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <?php if (isset($_SESSION['flash_message'])): ?>
-            <div class="alert alert-<?= $_SESSION['flash_type'] ?? 'info' ?> alert-dismissible fade show">
-                <?= $_SESSION['flash_message'] ?>
+        <?php if (Session::hasFlash('success')): ?>
+            <div class="alert alert-success alert-dismissible fade show">
+                <?= Session::getFlash('success') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
-            <?php unset($_SESSION['flash_message'], $_SESSION['flash_type']); ?>
+        <?php endif; ?>
+
+        <?php if (Session::hasFlash('error')): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <?= Session::getFlash('error') ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
         <?php endif; ?>
 
         <?= $content ?>
