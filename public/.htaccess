@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteBase /cms_sederhana/public/
+
+# Jika file atau direktori tidak ada
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Arahkan semua request ke index.php
+RewriteRule ^(.*)$ index.php [QSA,L] 

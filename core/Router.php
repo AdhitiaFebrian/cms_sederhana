@@ -48,7 +48,17 @@ class Router
 
     public function dispatch()
     {
+        // Ambil URL dan hapus base path
         $url = $_SERVER['REQUEST_URI'];
+        // Hapus bagian /cms_sederhana/public dari awal URL
+        $basePath = '/cms_sederhana/public';
+        if (strpos($url, $basePath) === 0) {
+            $url = substr($url, strlen($basePath));
+        }
+        // Jika kosong, set ke /
+        if ($url === '' || $url === false) {
+            $url = '/';
+        }
         $method = $_SERVER['REQUEST_METHOD'];
 
         if ($this->match($url, $method)) {
@@ -68,4 +78,4 @@ class Router
         header("HTTP/1.0 404 Not Found");
         echo "404 Not Found";
     }
-} 
+}
