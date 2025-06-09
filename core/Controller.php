@@ -8,16 +8,13 @@ abstract class Controller
 {
     protected function render($view, $data = [])
     {
-        // Extract data ke variabel
-        extract($data);
-        
-        // Load view file
-        $viewFile = APP_PATH . '/views/' . $view . '.php';
-        if (file_exists($viewFile)) {
-            require_once $viewFile;
-        } else {
-            throw new \Exception("View {$view} tidak ditemukan");
-        }
+        $view = new View($view, $data);
+        return $view->render();
+    }
+
+    protected function renderPartial($name, $data = [])
+    {
+        return View::partial($name, $data);
     }
 
     protected function redirect($url)

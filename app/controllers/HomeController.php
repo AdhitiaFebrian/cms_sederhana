@@ -12,6 +12,6 @@ class HomeController extends Controller
             'message' => 'Ini adalah halaman utama CMS'
         ];
         
-        $this->render('home/index', $data);
+        return $this->render('home/index', $data);
     }
 } 

@@ -1,0 +1,31 @@
+/* Custom styles */
+.navbar {
+    margin-bottom: 2rem;
+}
+
+.card {
+    margin-bottom: 1.5rem;
+}
+
+.btn-action {
+    margin-right: 0.5rem;
+}
+
+.table-actions {
+    white-space: nowrap;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.alert {
+    margin-bottom: 1.5rem;
+}
+
+footer {
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+} 
