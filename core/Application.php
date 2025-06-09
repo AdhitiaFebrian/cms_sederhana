@@ -6,14 +6,22 @@ namespace Core;
  */
 class Application
 {
+    private Router $router;
+
     public function __construct()
     {
-        // Inisialisasi aplikasi
+        $this->router = new Router();
+        $this->registerRoutes();
+    }
+
+    private function registerRoutes()
+    {
+        // Register routes di sini
+        $this->router->get('/', 'HomeController', 'index');
     }
 
     public function run()
     {
-        // Jalankan aplikasi
-        echo "MVC Framework berhasil dijalankan!";
+        $this->router->dispatch();
     }
 } 
